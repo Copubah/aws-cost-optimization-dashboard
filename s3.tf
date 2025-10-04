@@ -1,7 +1,9 @@
-# S3 Bucket for Cost Data Storage
+# Random ID for unique bucket naming
 resource "random_id" "bucket_suffix" {
   byte_length = 4
 }
+
+# S3 Bucket for Cost Data Storage
 
 resource "aws_s3_bucket" "cost_data" {
   bucket = "aws-cost-data-${var.environment}-${random_id.bucket_suffix.hex}"
@@ -42,6 +44,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "cost_data_lifecycle" {
     id     = "cost_data_lifecycle"
     status = "Enabled"
 
+    filter {
+      prefix = "cost_data/"
+    }
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -53,7 +59,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cost_data_lifecycle" {
     }
 
     expiration {
-      days = 2555  # 7 years retention
+      days = 2555 # 7 years retention
     }
   }
 }

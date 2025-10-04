@@ -8,8 +8,8 @@ import json
 import datetime
 import os
 import urllib3
-from typing import Dict, List, Optional
 import logging
+from typing import Dict
 
 # Configure logging
 logger = logging.getLogger()

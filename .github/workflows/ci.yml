@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
 jobs:
   terraform-validate:
     name: Terraform Validation
@@ -56,6 +61,10 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
     
     steps:
     - name: Checkout code
@@ -70,7 +79,7 @@ jobs:
         output: 'trivy-results.sarif'
         
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -90,93 +99,9 @@ jobs:
       with:
         terraform_version: 1.5.0
         
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
     - name: Terraform Init
-      run: terraform init
+      run: terraform init -backend=false
       
     - name: Terraform Plan
       run: terraform plan -no-color
       continue-on-error: true
-      
-    - name: Comment PR with plan
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const output = `#### Terraform Plan 📖
-          
-          \`\`\`
-          ${{ steps.plan.outputs.stdout }}
-          \`\`\`
-          
-          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: output
-          })
-
-  deploy-dev:
-    name: Deploy to Development
-    runs-on: ubuntu-latest
-    needs: [terraform-validate, python-lint, security-scan]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    environment: development
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.5.0
-        
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Terraform Init
-      run: terraform init
-      
-    - name: Terraform Apply
-      run: terraform apply -auto-approve -var="environment=dev"
-
-  deploy-prod:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [terraform-validate, python-lint, security-scan]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.5.0
-        
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Terraform Init
-      run: terraform init
-      
-    - name: Terraform Apply
-      run: terraform apply -auto-approve -var="environment=prod"

@@ -19,7 +19,7 @@ variable "cost_threshold" {
 variable "alert_schedule" {
   description = "Cron expression for cost check schedule (UTC)"
   type        = string
-  default     = "cron(0 8 * * ? *)"  # 8 AM UTC daily
+  default     = "cron(0 8 * * ? *)" # 8 AM UTC daily
 }
 
 variable "slack_secret_name" {

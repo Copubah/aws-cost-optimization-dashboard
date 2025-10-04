@@ -1,21 +1,21 @@
 # Lambda Function for Cost Collection and Alerting
 resource "aws_lambda_function" "cost_collector" {
-  filename         = "lambda_deployment.zip"
-  function_name    = "aws-cost-collector-${var.environment}"
-  role            = aws_iam_role.cost_lambda_role.arn
-  handler         = "handler.lambda_handler"
-  runtime         = "python3.11"
-  timeout         = 300
-  memory_size     = 256
-  
+  filename      = "lambda_deployment.zip"
+  function_name = "aws-cost-collector-${var.environment}"
+  role          = aws_iam_role.cost_lambda_role.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.11"
+  timeout       = 300
+  memory_size   = 256
+
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
-      BUCKET_NAME        = aws_s3_bucket.cost_data.bucket
-      COST_THRESHOLD     = var.cost_threshold
-      SLACK_SECRET_NAME  = var.slack_secret_name
-      ENVIRONMENT        = var.environment
+      BUCKET_NAME       = aws_s3_bucket.cost_data.bucket
+      COST_THRESHOLD    = var.cost_threshold
+      SLACK_SECRET_NAME = var.slack_secret_name
+      ENVIRONMENT       = var.environment
     }
   }
 
