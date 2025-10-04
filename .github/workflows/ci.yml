@@ -52,7 +52,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install black flake8 boto3 urllib3
         
-    - name: Run Black formatter
+    - name: Run Black formatter check
       run: black --check lambda/
       
     - name: Run Flake8 linting
