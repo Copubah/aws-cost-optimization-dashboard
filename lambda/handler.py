@@ -56,7 +56,8 @@ def lambda_handler(event, context):
         else:
             alert_sent = False
             logger.info(
-                f"Cost ${cost_summary['total_cost']:.2f} within threshold ${cost_threshold:.2f}"
+                f"Cost ${cost_summary['total_cost']:.2f} within threshold "
+                f"${cost_threshold:.2f}"
             )
 
         return {
@@ -209,7 +210,8 @@ def send_slack_alert(
                         {"type": "mrkdwn", "text": f"*Threshold:* ${threshold:.2f}"},
                         {
                             "type": "mrkdwn",
-                            "text": f"*Overage:* ${cost_summary['total_cost'] - threshold:.2f}",
+                            "text": f"*Overage:* "
+                            f"${cost_summary['total_cost'] - threshold:.2f}",
                         },
                     ],
                 },
@@ -225,7 +227,8 @@ def send_slack_alert(
                     "elements": [
                         {
                             "type": "mrkdwn",
-                            "text": f"Total services with costs: {cost_summary['service_count']}",
+                            "text": f"Total services with costs: "
+                            f"{cost_summary['service_count']}",
                         }
                     ],
                 },
