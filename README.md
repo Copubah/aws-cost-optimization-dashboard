@@ -2,6 +2,29 @@
 
 A comprehensive, automated cost monitoring solution that tracks daily AWS spending, stores historical cost data in S3, and sends intelligent Slack alerts when spending exceeds defined thresholds.
 
+**🔗 Repository:** https://github.com/Copubah/aws-cost-optimization-dashboard
+
+[![CI/CD Pipeline](https://github.com/Copubah/aws-cost-optimization-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Copubah/aws-cost-optimization-dashboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Terraform](https://img.shields.io/badge/Terraform-1.5+-purple.svg)](https://www.terraform.io/)
+[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+
+## Table of Contents
+
+- [Project Goals](#project-goals)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Configuration Options](#configuration-options)
+- [Sample Outputs](#sample-outputs)
+- [How the Lambda Function Works](#how-the-lambda-function-works)
+- [Customization Examples](#customization-examples)
+- [Best Practices](#best-practices)
+- [Cost Efficiency Tips](#cost-efficiency-tips)
+- [Testing & Monitoring](#testing--monitoring)
+- [Cleanup](#cleanup)
+- [Learning Outcomes](#learning-outcomes)
+
 ## Project Goals
 
 **Why Cost Visibility Matters for Cloud Engineers:**
@@ -31,6 +54,11 @@ A comprehensive, automated cost monitoring solution that tracks daily AWS spendi
                        │   (Alerts)      │
                        └─────────────────┘
 ```
+
+**📋 Detailed Architecture Documentation:**
+- [Complete Architecture Diagrams](docs/ARCHITECTURE_DIAGRAM.md) - Comprehensive system architecture with detailed component breakdown
+- [Interactive Mermaid Diagrams](docs/MERMAID_DIAGRAMS.md) - Visual flowcharts and sequence diagrams
+- [Architecture Deep Dive](docs/ARCHITECTURE.md) - Technical implementation details and design decisions
 
 ### Components Explained
 
@@ -73,8 +101,8 @@ aws-cost-optimization-dashboard/
 
 ### Step 1: Initial Setup
 ```bash
-# Clone or create the project
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/Copubah/aws-cost-optimization-dashboard.git
 cd aws-cost-optimization-dashboard
 
 # Run setup script (interactive)
