@@ -15,6 +15,7 @@ from typing import Dict
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def lambda_handler(event, context):
     """
     Main Lambda handler function
@@ -24,27 +25,27 @@ def lambda_handler(event, context):
         s3_client = boto3.client('s3')
         ce_client = boto3.client('ce')
         secrets_client = boto3.client('secretsmanager')
-        
+
         # Get environment variables
         bucket_name = os.environ['BUCKET_NAME']
         cost_threshold = float(os.environ.get('COST_THRESHOLD', 50.0))
         slack_secret_name = os.environ['SLACK_SECRET_NAME']
         environment = os.environ.get('ENVIRONMENT', 'dev')
-        
+
         logger.info(f"Starting cost collection for environment: {environment}")
         logger.info(f"Cost threshold: ${cost_threshold}")
-        
+
         # Get cost data from Cost Explorer
         cost_data = get_cost_data(ce_client)
-        
+
         # Store cost data in S3
         s3_key = store_cost_data(s3_client, bucket_name, cost_data)
         logger.info(f"Cost data stored in S3: {s3_key}")
-        
+
         # Process cost data and check threshold
         cost_summary = process_cost_data(cost_data)
         logger.info(f"Total daily cost: ${cost_summary['total_cost']:.2f}")
-        
+
         # Send Slack alert if threshold exceeded
         if cost_summary['total_cost'] > cost_threshold:
             slack_webhook_url = get_slack_webhook(secrets_client, slack_secret_name)
@@ -52,8 +53,10 @@ def lambda_handler(event, context):
             alert_sent = True
         else:
             alert_sent = False
-            logger.info(f"Cost ${cost_summary['total_cost']:.2f} within threshold ${cost_threshold:.2f}")
-        
+            logger.info(
+                f"Cost ${cost_summary['total_cost']:.2f} within threshold ${cost_threshold:.2f}"
+            )
+
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -64,7 +67,7 @@ def lambda_handler(event, context):
                 's3_key': s3_key
             })
         }
-        
+
     except Exception as e:
         logger.error(f"Error in cost collection: {str(e)}")
         return {
@@ -74,6 +77,7 @@ def lambda_handler(event, context):
             })
         }
 
+
 def get_cost_data(ce_client) -> Dict:
     """
     Fetch cost data from AWS Cost Explorer
@@ -82,9 +86,9 @@ def get_cost_data(ce_client) -> Dict:
     today = datetime.date.today()
     start_date = (today - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
     end_date = today.strftime('%Y-%m-%d')
-    
+
     logger.info(f"Fetching cost data for period: {start_date} to {end_date}")
-    
+
     try:
         response = ce_client.get_cost_and_usage(
             TimePeriod={
@@ -100,12 +104,13 @@ def get_cost_data(ce_client) -> Dict:
                 }
             ]
         )
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Error fetching cost data: {str(e)}")
         raise
+
 
 def store_cost_data(s3_client, bucket_name: str, cost_data: Dict) -> str:
     """
@@ -114,7 +119,7 @@ def store_cost_data(s3_client, bucket_name: str, cost_data: Dict) -> str:
     # Generate S3 key with timestamp
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d')
     s3_key = f"cost_data/daily/{timestamp}.json"
-    
+
     try:
         s3_client.put_object(
             Bucket=bucket_name,
@@ -122,12 +127,13 @@ def store_cost_data(s3_client, bucket_name: str, cost_data: Dict) -> str:
             Body=json.dumps(cost_data, indent=2, default=str),
             ContentType='application/json'
         )
-        
+
         return s3_key
-        
+
     except Exception as e:
         logger.error(f"Error storing cost data in S3: {str(e)}")
         raise
+
 
 def process_cost_data(cost_data: Dict) -> Dict:
     """
@@ -136,32 +142,33 @@ def process_cost_data(cost_data: Dict) -> Dict:
     try:
         results = cost_data['ResultsByTime'][0]
         total_cost = float(results['Total']['BlendedCost']['Amount'])
-        
+
         # Process service-level costs
         services = []
         for group in results.get('Groups', []):
             service_name = group['Keys'][0]
             service_cost = float(group['Metrics']['BlendedCost']['Amount'])
-            
+
             if service_cost > 0:  # Only include services with actual costs
                 services.append({
                     'name': service_name,
                     'cost': service_cost
                 })
-        
+
         # Sort services by cost (highest first)
         services.sort(key=lambda x: x['cost'], reverse=True)
-        
+
         return {
             'total_cost': total_cost,
             'date': results['TimePeriod']['Start'],
             'services': services[:10],  # Top 10 services
             'service_count': len(services)
         }
-        
+
     except Exception as e:
         logger.error(f"Error processing cost data: {str(e)}")
         raise
+
 
 def get_slack_webhook(secrets_client, secret_name: str) -> str:
     """
@@ -171,10 +178,11 @@ def get_slack_webhook(secrets_client, secret_name: str) -> str:
         response = secrets_client.get_secret_value(SecretId=secret_name)
         secret_data = json.loads(response['SecretString'])
         return secret_data['SLACK_WEBHOOK_URL']
-        
+
     except Exception as e:
         logger.error(f"Error retrieving Slack webhook: {str(e)}")
         raise
+
 
 def send_slack_alert(webhook_url: str, cost_summary: Dict, threshold: float, environment: str):
     """
@@ -185,16 +193,16 @@ def send_slack_alert(webhook_url: str, cost_summary: Dict, threshold: float, env
         top_services = ""
         for i, service in enumerate(cost_summary['services'][:5], 1):
             top_services += f"{i}. {service['name']}: ${service['cost']:.2f}\n"
-        
-        # Create Slack message
+
+        # Create Slack message (removed emojis for professional appearance)
         message = {
-            "text": f"🚨 *AWS Cost Alert - {environment.upper()}*",
+            "text": f"AWS Cost Alert - {environment.upper()}",
             "blocks": [
                 {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"🚨 AWS Cost Alert - {environment.upper()}"
+                        "text": f"AWS Cost Alert - {environment.upper()}"
                     }
                 },
                 {
@@ -236,7 +244,7 @@ def send_slack_alert(webhook_url: str, cost_summary: Dict, threshold: float, env
                 }
             ]
         }
-        
+
         # Send to Slack
         http = urllib3.PoolManager()
         response = http.request(
@@ -245,12 +253,12 @@ def send_slack_alert(webhook_url: str, cost_summary: Dict, threshold: float, env
             body=json.dumps(message),
             headers={'Content-Type': 'application/json'}
         )
-        
+
         if response.status == 200:
             logger.info("Slack alert sent successfully")
         else:
             logger.error(f"Failed to send Slack alert: {response.status}")
-            
+
     except Exception as e:
         logger.error(f"Error sending Slack alert: {str(e)}")
         raise
