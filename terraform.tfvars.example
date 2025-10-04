@@ -1,0 +1,22 @@
+# AWS Cost Optimization Dashboard - Configuration Example
+# Copy this file to terraform.tfvars and customize as needed
+
+# Environment name (dev, staging, prod)
+environment = "dev"
+
+# AWS region for deployment
+aws_region = "us-east-1"
+
+# Daily cost threshold in USD for alerts
+cost_threshold = 50.0
+
+# Cron expression for cost check schedule (UTC)
+# Default: Daily at 8 AM UTC
+# Examples:
+#   "cron(0 8 * * ? *)"     # Daily at 8 AM UTC
+#   "cron(0 8,20 * * ? *)"  # Twice daily at 8 AM and 8 PM UTC
+#   "cron(0 8 * * MON *)"   # Weekly on Mondays at 8 AM UTC
+alert_schedule = "cron(0 8 * * ? *)"
+
+# Slack webhook secret name in AWS Secrets Manager
+slack_secret_name = "slack/webhook/aws-cost-dashboard"
