@@ -1,8 +1,8 @@
 # AWS Cost Optimization Dashboard
 
-A comprehensive, automated cost monitoring solution that tracks daily AWS spending, stores historical cost data in S3, and sends intelligent Slack alerts when spending exceeds defined thresholds.
+An automated cost monitoring solution that tracks daily AWS spending, stores historical cost data in S3, calculates week-over-week trends, and sends Slack alerts when spending exceeds defined thresholds.
 
-**🔗 Repository:** https://github.com/Copubah/aws-cost-optimization-dashboard
+Repository: https://github.com/Copubah/aws-cost-optimization-dashboard
 
 [![CI/CD Pipeline](https://github.com/Copubah/aws-cost-optimization-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Copubah/aws-cost-optimization-dashboard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -18,214 +18,238 @@ A comprehensive, automated cost monitoring solution that tracks daily AWS spendi
 - [Configuration Options](#configuration-options)
 - [Sample Outputs](#sample-outputs)
 - [How the Lambda Function Works](#how-the-lambda-function-works)
-- [Customization Examples](#customization-examples)
 - [Best Practices](#best-practices)
-- [Cost Efficiency Tips](#cost-efficiency-tips)
-- [Testing & Monitoring](#testing--monitoring)
+- [Testing and Monitoring](#testing-and-monitoring)
 - [Cleanup](#cleanup)
 - [Learning Outcomes](#learning-outcomes)
 
 ## Project Goals
 
-**Why Cost Visibility Matters for Cloud Engineers:**
-- **Prevent Budget Overruns**: Catch unexpected spending before it impacts your budget
-- **Resource Accountability**: Identify which services and teams are driving costs
-- **Proactive Management**: Get real-time alerts before costs spiral out of control
-- **Data-Driven Decisions**: Historical cost data enables better resource optimization
-- **Team Awareness**: Slack integration keeps engineering teams informed about spending patterns
+Cost visibility matters because unmonitored cloud spend leads to budget overruns that compound before anyone notices. This project addresses that by running a daily automated check, storing historical data for trend analysis, and routing alerts directly to Slack where engineering teams already work.
+
+Specific goals:
+
+- Catch unexpected spending before it becomes a budget problem
+- Identify which AWS services are driving costs at a service level
+- Surface week-over-week cost changes so trends are visible, not just point-in-time values
+- Keep the alerting system itself observable through a Dead Letter Queue and CloudWatch alarms
+- Complement Lambda-based reporting with AWS Budgets for native forecasted-spend enforcement
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   EventBridge   │───▶│   Lambda Function │───▶│  Cost Explorer  │
-│  (Daily Cron)   │    │  (Cost Collector) │    │      API        │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   S3 Bucket     │    │ Secrets Manager │
-                       │ (Cost Data JSON)│    │ (Slack Webhook) │
-                       └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ Slack Channel   │
-                       │   (Alerts)      │
-                       └─────────────────┘
++-----------------+     +------------------+     +-------------------------+
+|   EventBridge   |---->|  Lambda Function |---->|   AWS Cost Explorer     |
+|  (Daily Cron)   |     |  (Cost Collector)|     |   (Billing API)         |
++-----------------+     +------------------+     +-------------------------+
+                                 |
+                                 v
+                    +---------------------------+
+                    |   Data Processing         |
+                    |   - Totals & breakdown    |
+                    |   - Week-over-week delta  |
+                    |   - Threshold check       |
+                    +---------------------------+
+                          |              |
+                          v              v
+               +----------+       +---------------------+
+               | S3 Bucket |       | Secrets Manager     |
+               | (JSON)    |       | (Slack webhook URL) |
+               +----------+       +---------------------+
+                                          |
+                                          v
+                               +--------------------+
+                               | Slack Channel      |
+                               | (Cost Alerts)      |
+                               +--------------------+
+                                          |
+                               (on failure)
+                                          v
+                               +--------------------+
+                               | SQS Dead Letter    |
+                               | Queue + CloudWatch |
+                               | Alarm              |
+                               +--------------------+
 ```
 
-**📋 Detailed Architecture Documentation:**
-- [Complete Architecture Diagrams](docs/ARCHITECTURE_DIAGRAM.md) - Comprehensive system architecture with detailed component breakdown
-- [Interactive Mermaid Diagrams](docs/MERMAID_DIAGRAMS.md) - Visual flowcharts and sequence diagrams
-- [Architecture Deep Dive](docs/ARCHITECTURE.md) - Technical implementation details and design decisions
+Detailed architecture documentation:
 
-### Components Explained
+- [Architecture Diagrams](docs/ARCHITECTURE_DIAGRAM.md) - Component breakdown and data flow
+- [Mermaid Diagrams](docs/MERMAID_DIAGRAMS.md) - Visual flowcharts rendered on GitHub
+- [Architecture Deep Dive](docs/ARCHITECTURE.md) - Technical design decisions
 
-- **Terraform**: Infrastructure as Code for reproducible deployments
-- **AWS Lambda**: Serverless function for cost collection and alerting logic
-- **AWS Cost Explorer**: Official AWS API for cost and usage data
-- **S3 Bucket**: Encrypted storage for historical cost data (JSON format)
-- **Secrets Manager**: Secure storage for Slack webhook URL
-- **EventBridge**: Scheduled triggers for daily cost checks
-- **IAM Roles**: Least-privilege security for AWS service access
+### Components
+
+- Terraform: Infrastructure as Code for all AWS resources
+- AWS Lambda: Serverless function running Python 3.11 for cost collection and alerting
+- AWS Cost Explorer: Official AWS billing API providing service-level daily cost data
+- AWS Budgets: Native budget enforcement with actual and forecasted spend alerts
+- S3 Bucket: Encrypted storage for historical cost data in JSON format
+- Secrets Manager: Secure storage for the Slack webhook URL
+- EventBridge: Scheduled daily trigger at 8 AM UTC
+- SQS Dead Letter Queue: Captures failed Lambda invocations so delivery failures are not silent
+- CloudWatch Alarms: Fires on DLQ depth and Lambda errors
+- IAM Roles: Least-privilege access scoped to specific resource ARNs
 
 ## Project Structure
 
 ```
 aws-cost-optimization-dashboard/
-├── terraform.tf          # Terraform provider configuration
-├── variables.tf          # Input variables and defaults
-├── outputs.tf            # Output values after deployment
-├── s3.tf                 # S3 bucket and lifecycle policies
-├── iam.tf                # IAM roles and policies
-├── lambda.tf             # Lambda function configuration
-├── eventbridge.tf        # EventBridge scheduling rules
+├── terraform.tf              # Provider configuration
+├── variables.tf              # Input variables with validation
+├── outputs.tf                # Deployment outputs
+├── s3.tf                     # S3 bucket and lifecycle policies
+├── iam.tf                    # IAM roles and policies
+├── lambda.tf                 # Lambda function, DLQ, CloudWatch alarms
+├── eventbridge.tf            # EventBridge scheduling
+├── budgets.tf                # AWS Budgets (actual + forecasted)
 ├── lambda/
-│   ├── handler.py        # Main Lambda function code
-│   └── requirements.txt  # Python dependencies
+│   ├── handler.py            # Lambda function code
+│   └── requirements.txt      # Python dependencies
+├── tests/
+│   └── test_handler.py       # Unit tests (24 tests, zero AWS calls)
 ├── scripts/
-│   ├── setup.sh          # Initial setup and prerequisites
-│   ├── deploy.sh         # Deployment automation
-│   └── test.sh           # Testing and validation
+│   ├── setup.sh              # Interactive setup
+│   ├── deploy.sh             # Deployment automation
+│   └── test.sh               # Smoke tests against deployed resources
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── ARCHITECTURE_DIAGRAM.md
+│   ├── DEPLOYMENT_GUIDE.md
+│   └── MERMAID_DIAGRAMS.md
 └── terraform.tfvars.example  # Configuration template
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- AWS CLI configured with appropriate permissions
-- Terraform >= 1.5.0
-- Slack webhook URL for notifications
-- Python 3.11+ (for local testing)
 
-### Step 1: Initial Setup
+- AWS CLI configured with appropriate permissions
+- Terraform 1.5 or later
+- Slack webhook URL
+- Python 3.11 or later (for running tests locally)
+
+### Step 1: Clone and configure
+
 ```bash
-# Clone the repository
 git clone https://github.com/Copubah/aws-cost-optimization-dashboard.git
 cd aws-cost-optimization-dashboard
 
-# Run setup script (interactive)
-./scripts/setup.sh
-```
-
-### Step 2: Configure Variables
-```bash
-# Copy example configuration
 cp terraform.tfvars.example terraform.tfvars
-
-# Edit configuration
-nano terraform.tfvars
+# Edit terraform.tfvars with your thresholds and email addresses
 ```
 
-### Step 3: Deploy Infrastructure
-```bash
-# Deploy with default settings
-./scripts/deploy.sh
+### Step 2: Store the Slack webhook
 
-# Or deploy to specific environment
-./scripts/deploy.sh --environment prod
+```bash
+aws secretsmanager create-secret \
+  --name "slack/webhook/aws-cost-dashboard" \
+  --description "Slack webhook for AWS cost alerts" \
+  --secret-string '{"SLACK_WEBHOOK_URL":"https://hooks.slack.com/services/YOUR/WEBHOOK/URL"}'
 ```
 
-### Step 4: Test Deployment
+### Step 3: Run unit tests
+
 ```bash
-# Test Lambda function and check logs
-./scripts/test.sh
+pip install pytest boto3 urllib3
+pytest tests/ -v
+```
+
+### Step 4: Deploy
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Step 5: Verify
+
+```bash
+# Invoke the Lambda manually and inspect the response
+aws lambda invoke \
+  --function-name $(terraform output -raw lambda_function_name) \
+  --payload '{}' \
+  response.json
+
+cat response.json
 ```
 
 ## Configuration Options
 
-### Environment Variables (terraform.tfvars)
+All options are set in `terraform.tfvars`. Copy `terraform.tfvars.example` as a starting point.
 
 ```hcl
-# Environment name (dev, staging, prod)
-environment = "prod"
-
-# Daily cost threshold in USD for alerts
-cost_threshold = 100.0
-
-# Cron expression for cost check schedule (UTC)
-alert_schedule = "cron(0 8 * * ? *)"  # Daily at 8 AM UTC
-
-# AWS region for deployment
-aws_region = "us-east-1"
+environment          = "prod"
+aws_region           = "us-east-1"
+cost_threshold       = 100.0        # Daily Lambda alert threshold in USD
+monthly_budget_limit = "2000"       # Monthly AWS Budgets limit in USD
+budget_alert_emails  = ["ops@example.com"]
+alert_schedule       = "cron(0 8 * * ? *)"  # 8 AM UTC daily
 ```
 
-### Schedule Examples
-```hcl
-# Daily at 8 AM UTC
-alert_schedule = "cron(0 8 * * ? *)"
+Schedule examples:
 
-# Twice daily (8 AM and 8 PM UTC)
+```hcl
+# Twice daily
 alert_schedule = "cron(0 8,20 * * ? *)"
 
-# Weekly on Mondays at 8 AM UTC
-alert_schedule = "cron(0 8 * * MON *)"
-
-# Business days only at 9 AM UTC
+# Weekdays only
 alert_schedule = "cron(0 9 * * MON-FRI *)"
 ```
 
 ## Sample Outputs
 
-### Terraform Deployment
+### Terraform apply
+
 ```
-Apply complete! Resources: 12 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
 
 Outputs:
-environment = "dev"
-cost_threshold = 50
-eventbridge_rule_name = "daily-cost-check-dev"
-iam_role_arn = "arn:aws:iam::123456789012:role/cost-optimization-lambda-role-dev"
-lambda_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:aws-cost-collector-dev"
+environment          = "dev"
+cost_threshold       = 50
+monthly_budget_limit = "500"
 lambda_function_name = "aws-cost-collector-dev"
-s3_bucket_arn = "arn:aws:s3:::aws-cost-data-dev-a1b2c3d4"
-s3_bucket_name = "aws-cost-data-dev-a1b2c3d4"
-slack_secret_name = "slack/webhook/aws-cost-dashboard"
+lambda_dlq_url       = "https://sqs.us-east-1.amazonaws.com/123456789012/cost-collector-dlq-dev"
+s3_bucket_name       = "aws-cost-data-dev-a1b2c3d4"
+eventbridge_rule_name = "daily-cost-check-dev"
 ```
 
-### Enhanced Slack Alert
+### Slack alert
+
 ```
 AWS Cost Alert - PROD
 
-Date: 2024-01-15
-Total Spend: $125.43
-Threshold: $100.00
-Overage: $25.43
+Date:              2024-01-15
+Total Spend:       $125.43
+Threshold:         $100.00
+Overage:           $25.43
+Week-over-Week:    up 12.3% vs same day last week
+Services with spend: 12
 
 Top 5 Services:
-1. Amazon Elastic Compute Cloud - Compute: $65.20
-2. Amazon Simple Storage Service: $25.15
-3. Amazon Relational Database Service: $18.50
+1. Amazon EC2: $65.20
+2. Amazon S3: $25.15
+3. Amazon RDS: $18.50
 4. Amazon CloudFront: $12.30
 5. AWS Lambda: $4.28
-
-Total services with costs: 12
 ```
 
-### S3 Cost Data Structure
+### S3 cost data (JSON)
+
 ```json
 {
   "ResultsByTime": [
     {
-      "TimePeriod": {
-        "Start": "2024-01-15",
-        "End": "2024-01-16"
-      },
+      "TimePeriod": { "Start": "2024-01-15", "End": "2024-01-16" },
       "Total": {
-        "BlendedCost": {
-          "Amount": "125.43",
-          "Unit": "USD"
-        }
+        "BlendedCost": { "Amount": "125.43", "Unit": "USD" }
       },
       "Groups": [
         {
-          "Keys": ["Amazon Elastic Compute Cloud - Compute"],
+          "Keys": ["Amazon EC2"],
           "Metrics": {
-            "BlendedCost": {
-              "Amount": "65.20",
-              "Unit": "USD"
-            }
+            "BlendedCost": { "Amount": "65.20", "Unit": "USD" }
           }
         }
       ]
@@ -236,397 +260,152 @@ Total services with costs: 12
 
 ## How the Lambda Function Works
 
-### Step-by-Step Process
+The handler runs these steps in sequence on each invocation:
 
-1. **Triggered Daily**: EventBridge triggers Lambda at scheduled time
-2. **Fetch Cost Data**: Calls Cost Explorer API for previous day's costs
-3. **Process Data**: Calculates totals and identifies top spending services
-4. **Store in S3**: Saves raw cost data as JSON for historical analysis
-5. **Check Threshold**: Compares total cost against configured threshold
-6. **Send Alert**: If threshold exceeded, formats and sends Slack message
-7. **Log Results**: Records execution details in CloudWatch Logs
+1. Fetch yesterday's cost data from Cost Explorer, grouped by AWS service
+2. Store the raw API response to S3 as `cost_data/daily/YYYY-MM-DD.json`
+3. Process the response: calculate total, rank services by cost, filter zero-spend services
+4. Read last week's S3 file (same weekday minus 7 days) and compute the week-over-week delta
+5. Compare the total against the configured threshold
+6. If the threshold is exceeded, retrieve the Slack webhook from Secrets Manager and post the alert
+7. If Slack returns a non-200 response, raise an exception so the failed invocation routes to the DLQ
 
-### Key Features
-
-- **Service-Level Breakdown**: Shows which AWS services are driving costs
-- **Historical Storage**: All cost data stored in S3 with lifecycle policies
-- **Error Handling**: Comprehensive error handling and logging
-- **Security**: Uses IAM roles and Secrets Manager for secure access
-- **Customizable**: Easy to modify thresholds, schedules, and alert formats
-
-## Customization Examples
-
-### Enhanced Alert Logic
-```python
-# Add to Lambda handler.py
-def should_send_alert(cost_summary, threshold, historical_data):
-    """Enhanced alerting logic with trend analysis"""
-    current_cost = cost_summary['total_cost']
-    
-    # Basic threshold check
-    if current_cost > threshold:
-        return True
-    
-    # Trend-based alerting (30% increase from average)
-    if historical_data:
-        avg_cost = sum(historical_data) / len(historical_data)
-        if current_cost > avg_cost * 1.3:
-            return True
-    
-    return False
-```
-
-### Multi-Environment Support
-```hcl
-# Deploy multiple environments
-module "cost_dashboard_dev" {
-  source = "./modules/cost-dashboard"
-  environment = "dev"
-  cost_threshold = 25.0
-}
-
-module "cost_dashboard_prod" {
-  source = "./modules/cost-dashboard"
-  environment = "prod"
-  cost_threshold = 200.0
-}
-```
+The DLQ alarm fires within 5 minutes of any failure, so the alerting pipeline is itself monitored.
 
 ## Best Practices
 
-### Security Best Practices
+### Security
 
-#### IAM Least Privilege
-- **Lambda Execution Role**: Minimal required permissions only
-- **Cost Explorer Access**: Limited to `GetCostAndUsage` and `GetUsageReport`
-- **S3 Access**: Restricted to specific bucket and `cost_data/` prefix
-- **Secrets Manager**: Access limited to specific webhook secret
-- **Resource-Based Policies**: Use resource ARNs instead of wildcards
+IAM permissions follow least privilege. Each statement is scoped to a specific resource ARN:
 
-#### Data Protection
-- **Encryption at Rest**: S3 bucket encryption with AES256 or KMS
-- **Encryption in Transit**: HTTPS for all API calls and Slack webhooks
-- **Secrets Management**: Store sensitive data in AWS Secrets Manager
-- **Access Logging**: Enable CloudTrail for audit trail
-- **Data Retention**: Implement lifecycle policies for cost data
+- Cost Explorer access: `ce:GetCostAndUsage`, `ce:GetUsageReport`, `ce:GetDimensionValues`
+- S3 write: `s3:PutObject` scoped to the cost data bucket ARN
+- S3 read: `s3:GetObject` scoped to `cost_data/*` for week-over-week lookups
+- Secrets Manager: `secretsmanager:GetSecretValue` scoped to the specific secret ARN
+- SQS: `sqs:SendMessage` scoped to the DLQ ARN
 
-#### Network Security
-```hcl
-# Deploy Lambda in VPC for enhanced security
-resource "aws_lambda_function" "cost_collector" {
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda_sg.id]
-  }
-}
+The Slack webhook URL is stored in Secrets Manager, not in environment variables or source code.
 
-# Use VPC endpoints for AWS services
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${var.aws_region}.s3"
-}
-```
+S3 is configured with server-side encryption (AES256), public access blocked on all four settings, and versioning enabled.
 
-### Infrastructure Best Practices
+For production, deploy the Lambda inside a VPC with private subnets and VPC endpoints for S3, Secrets Manager, and Cost Explorer to eliminate traffic over the public internet.
 
-#### Terraform Organization
-- **State Management**: Use remote state with S3 backend and DynamoDB locking
-- **Module Structure**: Organize code into reusable modules
-- **Variable Validation**: Implement input validation for critical parameters
-- **Resource Tagging**: Consistent tagging strategy for all resources
-- **Version Pinning**: Pin provider and module versions
+### Infrastructure
+
+Use a remote Terraform backend in production:
 
 ```hcl
-# terraform.tf - Remote state configuration
 terraform {
   backend "s3" {
-    bucket         = "your-terraform-state-bucket"
+    bucket         = "your-tfstate-bucket"
     key            = "cost-dashboard/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "terraform-state-lock"
     encrypt        = true
   }
 }
-
-# variables.tf - Input validation
-variable "cost_threshold" {
-  description = "Daily cost threshold in USD for alerts"
-  type        = number
-  validation {
-    condition     = var.cost_threshold > 0 && var.cost_threshold <= 10000
-    error_message = "Cost threshold must be between 0 and 10000."
-  }
-}
 ```
 
-#### Resource Naming
-- **Consistent Naming**: Use standardized naming conventions
-- **Environment Prefixes**: Include environment in resource names
-- **Resource Suffixes**: Use descriptive suffixes for resource types
+Pin provider versions. The `.terraform.lock.hcl` file is committed to the repository to ensure reproducible deployments.
 
-```hcl
-# Naming convention examples
-resource "aws_lambda_function" "cost_collector" {
-  function_name = "${var.project_name}-cost-collector-${var.environment}"
-}
+### Observability
 
-resource "aws_s3_bucket" "cost_data" {
-  bucket = "${var.project_name}-cost-data-${var.environment}-${random_id.suffix.hex}"
-}
-```
+Two CloudWatch alarms are deployed alongside the Lambda:
 
-### Operational Best Practices
+- DLQ depth alarm: fires when any message lands in the DLQ (catches failed Slack delivery and unhandled exceptions)
+- Lambda errors alarm: fires when the function itself returns an error
 
-#### Monitoring and Alerting
-- **CloudWatch Alarms**: Monitor Lambda errors, duration, and throttles
-- **Log Aggregation**: Centralized logging with structured log format
-- **Metrics Dashboard**: Create CloudWatch dashboard for cost trends
-- **Dead Letter Queues**: Handle failed Lambda executions
+Both alarms use `treat_missing_data = "notBreaching"` to avoid false positives on days with no invocations.
 
-```hcl
-# CloudWatch alarms for operational monitoring
-resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  alarm_name          = "${var.project_name}-lambda-errors-${var.environment}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "Errors"
-  namespace           = "AWS/Lambda"
-  period              = "300"
-  statistic           = "Sum"
-  threshold           = "0"
-  alarm_description   = "Lambda function errors"
-  
-  alarm_actions = [aws_sns_topic.alerts.arn]
-}
+Log retention is set to 14 days to balance operational visibility against cost.
 
-resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
-  alarm_name          = "${var.project_name}-lambda-duration-${var.environment}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "Duration"
-  namespace           = "AWS/Lambda"
-  period              = "300"
-  statistic           = "Average"
-  threshold           = "240000"  # 4 minutes
-  alarm_description   = "Lambda function duration"
-}
-```
+### AWS Budgets vs Lambda threshold
 
-#### Error Handling and Resilience
-- **Retry Logic**: Implement exponential backoff for API calls
-- **Circuit Breaker**: Prevent cascading failures
-- **Graceful Degradation**: Continue operation with partial data
-- **Dead Letter Queue**: Handle persistent failures
+These serve different purposes and complement each other:
 
-```python
-# Enhanced error handling in Lambda
-import time
-import random
-from botocore.exceptions import ClientError
+- The Lambda threshold triggers on daily actual spend with a service-level breakdown and week-over-week context
+- AWS Budgets triggers on monthly actual spend (at 80% and 100%) and monthly forecasted spend (at 100%)
 
-def retry_with_backoff(func, max_retries=3, base_delay=1):
-    """Retry function with exponential backoff"""
-    for attempt in range(max_retries):
-        try:
-            return func()
-        except ClientError as e:
-            if attempt == max_retries - 1:
-                raise
-            
-            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay:.2f}s: {e}")
-            time.sleep(delay)
-```
+The forecasted alert is the most operationally valuable: it fires before the month ends, giving time to respond.
 
-#### Cost Optimization
-- **Lambda Right-Sizing**: Monitor and adjust memory allocation
-- **S3 Storage Classes**: Use appropriate storage classes for different data ages
-- **API Call Optimization**: Minimize Cost Explorer API calls
-- **Resource Cleanup**: Implement automated cleanup for temporary resources
+### Testing
 
-```hcl
-# S3 intelligent tiering for cost optimization
-resource "aws_s3_bucket_intelligent_tiering_configuration" "cost_data" {
-  bucket = aws_s3_bucket.cost_data.id
-  name   = "EntireBucket"
+Run the unit test suite before deploying:
 
-  tiering {
-    access_tier = "DEEP_ARCHIVE_ACCESS"
-    days        = 180
-  }
-}
-```
-
-### Development Best Practices
-
-#### Code Quality
-- **Linting**: Use tools like `pylint`, `black`, and `terraform fmt`
-- **Testing**: Unit tests for Lambda functions, integration tests for infrastructure
-- **Documentation**: Comprehensive README and inline code documentation
-- **Version Control**: Semantic versioning and conventional commits
-
-#### CI/CD Pipeline
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy Cost Dashboard
-on:
-  push:
-    branches: [main]
-    
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        
-      - name: Terraform Format Check
-        run: terraform fmt -check
-        
-      - name: Terraform Validate
-        run: terraform validate
-        
-      - name: Terraform Plan
-        run: terraform plan
-        
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
-```
-
-#### Environment Management
-- **Environment Separation**: Separate AWS accounts or regions for dev/staging/prod
-- **Configuration Management**: Environment-specific variable files
-- **Promotion Strategy**: Automated promotion through environments
-- **Rollback Procedures**: Quick rollback capabilities for failed deployments
-
-## Cost Efficiency Tips
-
-### Lambda Optimization
-- **Memory**: 256MB is sufficient for Cost Explorer API calls
-- **Timeout**: 300 seconds handles API delays gracefully
-- **Runtime**: Python 3.11 for latest performance improvements
-
-### S3 Storage Optimization
-```hcl
-# Lifecycle policy in s3.tf
-rule {
-  id     = "cost_data_lifecycle"
-  status = "Enabled"
-
-  transition {
-    days          = 30
-    storage_class = "STANDARD_IA"  # Cheaper after 30 days
-  }
-
-  transition {
-    days          = 90
-    storage_class = "GLACIER"      # Archive after 90 days
-  }
-
-  expiration {
-    days = 2555  # Delete after 7 years
-  }
-}
-```
-
-### Cost Explorer API Optimization
-- Single daily API call minimizes costs
-- Service-level grouping provides maximum insight
-- Efficient date range queries (previous day only)
-
-## Testing & Monitoring
-
-### Manual Testing
 ```bash
-# Test Lambda function
+pytest tests/ -v
+```
+
+The 24 tests cover all handler functions using mocks. No AWS credentials or network access are required.
+
+## Testing and Monitoring
+
+### Run unit tests
+
+```bash
+pytest tests/ -v --tb=short
+```
+
+### Invoke the Lambda manually
+
+```bash
 aws lambda invoke \
   --function-name $(terraform output -raw lambda_function_name) \
   --payload '{}' \
   response.json
 
-# Check CloudWatch logs
-aws logs tail /aws/lambda/$(terraform output -raw lambda_function_name) --follow
-
-# List S3 cost files
-aws s3 ls s3://$(terraform output -raw s3_bucket_name)/cost_data/daily/
+cat response.json
 ```
 
-### Monitoring Setup
-```hcl
-# CloudWatch alarms for Lambda errors
-resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
-  alarm_name          = "cost-collector-errors-${var.environment}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "Errors"
-  namespace           = "AWS/Lambda"
-  period              = "300"
-  statistic           = "Sum"
-  threshold           = "0"
-  alarm_description   = "This metric monitors lambda errors"
+### Tail CloudWatch logs
 
-  dimensions = {
-    FunctionName = aws_lambda_function.cost_collector.function_name
-  }
-}
+```bash
+aws logs tail /aws/lambda/$(terraform output -raw lambda_function_name) --follow
+```
+
+### Check the DLQ
+
+```bash
+aws sqs get-queue-attributes \
+  --queue-url $(terraform output -raw lambda_dlq_url) \
+  --attribute-names ApproximateNumberOfMessages
+```
+
+### List stored cost files
+
+```bash
+aws s3 ls s3://$(terraform output -raw s3_bucket_name)/cost_data/daily/ --recursive
 ```
 
 ## Cleanup
 
-### Complete Removal
 ```bash
-# Destroy all resources
+# Destroy all provisioned resources
 terraform destroy
 
-# Delete Slack webhook secret
+# Delete the Slack webhook secret
 aws secretsmanager delete-secret \
   --secret-id "slack/webhook/aws-cost-dashboard" \
   --force-delete-without-recovery
 
-# Clean up local files
-rm -f lambda_deployment.zip response.json tfplan
+# Remove local build artifacts
+rm -f lambda_deployment.zip response.json
 ```
 
 ## Learning Outcomes
 
-This project teaches essential cloud engineering skills:
+This project covers the following areas relevant to cloud and DevOps engineering roles:
 
-### 1. Infrastructure as Code (IaC)
-- **Terraform Mastery**: Resource management, state handling, modules
-- **AWS Provider**: Understanding AWS resource relationships
-- **Best Practices**: Code organization, variable management, outputs
+Infrastructure as Code: Modular Terraform with resource-scoped IAM, lifecycle policies, and input validation.
 
-### 2. AWS Cost Management
-- **Cost Explorer API**: Programmatic access to billing data
-- **Cost Dimensions**: Understanding AWS billing structure
-- **Budget Governance**: Implementing automated cost controls
+AWS Cost Management: Practical use of the Cost Explorer API and AWS Budgets, including the difference between actual-spend and forecasted-spend alerting.
 
-### 3. Serverless Architecture
-- **Lambda Functions**: Event-driven computing patterns
-- **EventBridge**: Scheduled automation and event routing
-- **IAM Security**: Role-based access control for serverless
+Serverless Architecture: Event-driven Lambda with scheduled triggers, environment-variable configuration, and DLQ-based failure handling.
 
-### 4. DevOps Integration
-- **Slack Integration**: Team notification workflows
-- **Monitoring**: CloudWatch logs and metrics
-- **Automation**: CI/CD considerations for infrastructure
+Observability: CloudWatch alarms on both Lambda errors and DLQ depth, structured logging, and log retention policies.
 
-### 5. Data Management
-- **JSON Processing**: Handling structured cost data
-- **S3 Lifecycle**: Storage optimization strategies
-- **Historical Analysis**: Building data lakes for cost trends
+Testing: Unit test suite with mocked AWS clients covering all handler functions, including failure paths.
 
-### 6. Security Implementation
-- **Secrets Management**: AWS Secrets Manager integration
-- **Encryption**: Data protection at rest and in transit
-- **Least Privilege**: Minimal permission strategies
+Security: Secrets Manager integration, least-privilege IAM, S3 encryption, and VPC deployment patterns.
 
-### 7. Operational Excellence
-- **Error Handling**: Robust failure management
-- **Logging**: Comprehensive operational visibility
-- **Testing**: Automated validation and monitoring
-
-This project provides a solid foundation for building more sophisticated cost management solutions, including budget forecasting, anomaly detection, and automated resource optimization based on spending patterns.
+DevOps: CI/CD pipeline with Black formatting, Flake8 linting, pytest, Terraform validation, Checkov IaC security scanning, and Trivy vulnerability scanning.

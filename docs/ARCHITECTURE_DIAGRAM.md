@@ -1,4 +1,4 @@
-# AWS Cost Optimization Dashboard - Architecture Diagram
+# Architecture Diagram
 
 ## High-Level System Architecture
 
@@ -296,4 +296,4 @@ s3://aws-cost-data-{env}-{random}/
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-This architecture provides a comprehensive view of the AWS Cost Optimization Dashboard, showing all components, data flows, security measures, and integration points in a scalable, maintainable, and cost-effective design.
+This architecture provides a comprehensive view of the AWS Cost Optimization Dashboard, showing all components, data flows, security measures, and integration points.

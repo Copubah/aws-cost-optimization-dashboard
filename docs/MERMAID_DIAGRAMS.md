@@ -1,4 +1,4 @@
-# AWS Cost Optimization Dashboard - Mermaid Diagrams
+# Mermaid Diagrams
 
 ## System Architecture Flow
 
@@ -293,4 +293,4 @@ graph TB
     style GHA fill:#f3e5f5
 ```
 
-These diagrams provide multiple perspectives on the AWS Cost Optimization Dashboard architecture, from high-level system flow to detailed security and deployment strategies. They can be rendered directly in GitHub README files and documentation platforms that support Mermaid syntax.
+These diagrams provide multiple perspectives on the architecture, from high-level system flow to detailed security and deployment strategies. They render in GitHub and any documentation platform that supports Mermaid syntax.

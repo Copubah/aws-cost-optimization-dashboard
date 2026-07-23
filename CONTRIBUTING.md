@@ -1,115 +1,112 @@
 # Contributing to AWS Cost Optimization Dashboard
 
-Thank you for your interest in contributing to the AWS Cost Optimization Dashboard project! This document provides guidelines for contributing to the project.
+This document explains how to contribute to the project.
 
-## Code of Conduct
+## Reporting Issues
 
-This project adheres to a code of conduct. By participating, you are expected to uphold this code.
+Before opening an issue:
 
-## How to Contribute
+1. Check whether the issue already exists in the GitHub Issues list.
+2. Provide a clear, descriptive title.
+3. Include steps to reproduce the issue.
+4. Include your environment details: Terraform version, AWS CLI version, Python version, and OS.
 
-### Reporting Issues
+## Submitting Changes
 
-Before creating an issue, please:
-1. Check if the issue already exists in the GitHub Issues
-2. Provide a clear and descriptive title
-3. Include steps to reproduce the issue
-4. Provide your environment details (Terraform version, AWS CLI version, etc.)
-
-### Submitting Changes
-
-1. **Fork the repository**
-2. **Create a feature branch** from `main`
+1. Fork the repository.
+2. Create a feature branch from `main`:
    ```bash
    git checkout -b feature/your-feature-name
    ```
-3. **Make your changes** following the coding standards
-4. **Test your changes** thoroughly
-5. **Commit your changes** with descriptive commit messages
-6. **Push to your fork** and submit a pull request
+3. Make your changes following the coding standards below.
+4. Run the test suite and ensure it passes.
+5. Commit with a descriptive message.
+6. Push to your fork and open a pull request.
 
-### Pull Request Guidelines
+## Pull Request Guidelines
 
-- Provide a clear description of the changes
-- Include any relevant issue numbers
-- Ensure all tests pass
-- Update documentation as needed
-- Follow the existing code style
+- Describe what the change does and why.
+- Reference any related issues.
+- Ensure all CI checks pass before requesting review.
+- Update documentation if the change affects behaviour or configuration.
+- Follow the existing code style.
 
 ## Development Setup
 
-### Prerequisites
+Requirements:
+
 - AWS CLI configured with appropriate permissions
-- Terraform >= 1.5.0
-- Python 3.11+
+- Terraform 1.5 or later
+- Python 3.11 or later
 - Git
 
-### Local Development
+Local setup:
+
 ```bash
-# Clone your fork
 git clone https://github.com/your-username/aws-cost-optimization-dashboard.git
 cd aws-cost-optimization-dashboard
 
-# Install development dependencies
-pip install -r lambda/requirements.txt
-pip install pytest black pylint
+pip install pytest black flake8 boto3 urllib3
 
 # Run tests
-pytest tests/
+pytest tests/ -v
 
 # Format code
-black lambda/
-terraform fmt
+black lambda/ tests/
+
+# Lint
+flake8 lambda/handler.py tests/test_handler.py --max-line-length=88
+
+# Validate Terraform
+terraform fmt -check -recursive
+terraform init -backend=false
+terraform validate
 ```
 
 ## Coding Standards
 
-### Terraform
-- Use consistent naming conventions
-- Include descriptions for all variables and outputs
-- Use appropriate resource tags
-- Follow security best practices
-
 ### Python
-- Follow PEP 8 style guidelines
-- Use type hints where appropriate
-- Include docstrings for functions and classes
-- Handle errors gracefully
+
+- Follow PEP 8.
+- Format with Black (line length 88).
+- Lint with Flake8.
+- Add type hints to all function signatures.
+- Write a docstring for every function.
+- Handle errors explicitly; avoid bare `except` clauses.
+
+### Terraform
+
+- Run `terraform fmt` before committing.
+- Include `description` on all variables and outputs.
+- Scope IAM permissions to specific resource ARNs, not wildcards.
+- Use `var.environment` in resource names for multi-environment compatibility.
 
 ### Documentation
-- Update README.md for significant changes
-- Include inline comments for complex logic
-- Provide examples for new features
 
-## Testing
+- Update `README.md` for any change that affects setup, configuration, or behaviour.
+- Update `CHANGELOG.md` under the appropriate version section.
+- Add inline comments for non-obvious logic.
 
-### Unit Tests
+## Running Tests
+
 ```bash
-# Run Python unit tests
-pytest tests/unit/
-
-# Run Terraform validation
-terraform validate
-terraform plan
+pytest tests/ -v --tb=short
 ```
 
-### Integration Tests
-```bash
-# Run integration tests (requires AWS credentials)
-pytest tests/integration/
-```
+All 24 tests must pass. The tests use mocked AWS clients and do not require
+AWS credentials or network access.
 
 ## Release Process
 
-1. Update version numbers
-2. Update CHANGELOG.md
-3. Create a pull request to main
-4. After merge, create a release tag
-5. Update documentation
+1. Update `CHANGELOG.md` with the new version and release date.
+2. Open a pull request to `main`.
+3. After merge, create a release tag following semantic versioning (e.g. `v2.1.0`).
+4. Update documentation if the release includes breaking changes.
 
-## Questions?
+## Questions
 
-If you have questions about contributing, please:
-1. Check the existing documentation
-2. Search through existing issues
-3. Create a new issue with the "question" label
+If something is unclear:
+
+1. Check the existing documentation in the `docs/` directory.
+2. Search the existing GitHub Issues.
+3. Open a new issue with the label `question`.
