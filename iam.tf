@@ -56,6 +56,18 @@ resource "aws_iam_role_policy" "cost_lambda_policy" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:${var.slack_secret_name}*"
+      },
+      {
+        # Allow Lambda to write failed invocations to its DLQ
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.lambda_dlq.arn
+      },
+      {
+        # Allow WoW delta lookups (read yesterday-7d file from S3)
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${aws_s3_bucket.cost_data.arn}/cost_data/*"
       }
     ]
   })

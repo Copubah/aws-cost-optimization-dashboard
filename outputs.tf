@@ -18,6 +18,16 @@ output "lambda_function_arn" {
   value       = aws_lambda_function.cost_collector.arn
 }
 
+output "lambda_dlq_url" {
+  description = "SQS DLQ URL — messages here mean a Lambda invocation failed"
+  value       = aws_sqs_queue.lambda_dlq.url
+}
+
+output "lambda_dlq_arn" {
+  description = "SQS DLQ ARN"
+  value       = aws_sqs_queue.lambda_dlq.arn
+}
+
 output "eventbridge_rule_name" {
   description = "Name of the EventBridge rule"
   value       = aws_cloudwatch_event_rule.daily_cost_check.name
@@ -29,8 +39,13 @@ output "iam_role_arn" {
 }
 
 output "cost_threshold" {
-  description = "Current cost threshold for alerts"
+  description = "Daily cost threshold for Lambda alerts (USD)"
   value       = var.cost_threshold
+}
+
+output "monthly_budget_limit" {
+  description = "Monthly budget limit for AWS Budgets (USD)"
+  value       = var.monthly_budget_limit
 }
 
 output "environment" {

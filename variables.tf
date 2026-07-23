@@ -8,12 +8,34 @@ variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string
   default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod."
+  }
 }
 
 variable "cost_threshold" {
-  description = "Daily cost threshold in USD for alerts"
+  description = "Daily cost threshold in USD — Lambda alerts when exceeded"
   type        = number
   default     = 50.0
+
+  validation {
+    condition     = var.cost_threshold > 0
+    error_message = "cost_threshold must be greater than 0."
+  }
+}
+
+variable "monthly_budget_limit" {
+  description = "Monthly budget limit in USD for AWS Budgets (actual + forecasted alerts)"
+  type        = string
+  default     = "500"
+}
+
+variable "budget_alert_emails" {
+  description = "Email addresses to notify when AWS Budgets thresholds are breached"
+  type        = list(string)
+  default     = []
 }
 
 variable "alert_schedule" {

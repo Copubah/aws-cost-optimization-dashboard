@@ -7,15 +7,19 @@ environment = "dev"
 # AWS region for deployment
 aws_region = "us-east-1"
 
-# Daily cost threshold in USD for alerts
+# Daily cost threshold in USD for Lambda alerts
 cost_threshold = 50.0
 
-# Cron expression for cost check schedule (UTC)
-# Default: Daily at 8 AM UTC
+# Monthly budget limit in USD for AWS Budgets (actual + forecasted)
+monthly_budget_limit = "500"
+
+# Email addresses to receive AWS Budgets breach notifications
+budget_alert_emails = ["your-email@example.com"]
+
+# Cron expression for daily cost check schedule (UTC)
 # Examples:
-#   "cron(0 8 * * ? *)"     # Daily at 8 AM UTC
-#   "cron(0 8,20 * * ? *)"  # Twice daily at 8 AM and 8 PM UTC
-#   "cron(0 8 * * MON *)"   # Weekly on Mondays at 8 AM UTC
+#   "cron(0 8 * * ? *)"    - Daily at 8 AM UTC
+#   "cron(0 8,20 * * ? *)" - Twice daily at 8 AM and 8 PM UTC
 alert_schedule = "cron(0 8 * * ? *)"
 
 # Slack webhook secret name in AWS Secrets Manager
